@@ -12,7 +12,7 @@ python -m venv .venv
 
 # Git Bash on Windows
 ource .venv/Scripts/activate 
-  
+
 # Linux / macOS
 source .venv/bin/activate
 
@@ -22,14 +22,14 @@ pip install -e .[dev]
 ## Usage
 
 ```bash
-python main.py path/to/logfile.log
+python main.py "path/to/logfile.log"
 ```
 
-If only a filename is provided, the tool will search for it in the current directory:
+<!-- If only a filename is provided, the tool will search for it in the current directory:
 
 ```bash
 python main.py logfile.log
-```
+``` -->
 
 ## Running Tests
 

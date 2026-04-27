@@ -7,7 +7,7 @@ Parse Logs(extract IP,URL)
 Aggregate (Unique IPs,  3 most active IPs,  3 most visited URLs)
     Count and store
 
-Output(Console)
+Result(Console)
     Sort and Return Result
     stdout/print
 
@@ -18,13 +18,12 @@ Output(Console)
    Configuration(topk)
 
 2. Modular
-   Reader, Parser, Ananlyzer
+   Reader, Parser, Ananlyzer, Result
 
 3. Data Storage
    file loading - stream line-by-line
    Aggregator(URL, IP, counter) - in memory
    Set(unique IP, URL)
-
 
 4. Testing
     Unit Testing
@@ -36,6 +35,9 @@ Output(Console)
 
 5. Error handling
     Malformed, empty, duplicate lines - Fail
-    Skip and log bad lines
-    Tadeoff - avoid fail fast
-     
+    Skip and log bad lines, Tadeoff - avoid fail fast
+    Empty file - fail fast
+
+6. Scalability
+    Stream line-by-line handle large file in GBs.
+    In Memory usage need replacement for large files and persistent storage
