@@ -1,106 +1,82 @@
-import pytest
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 from pathlib import Path
 
-from main import main
+from main import validate_file, process_file
 
 
-class TestMainValidFile:
-    def test_valid_file_prints_processing(self, tmp_path, capsys):
-        log_file = tmp_path / "sample.log"
-        log_file.write_text("log line")
-
-        with patch("sys.argv", ["main.py", str(log_file)]):
-            main()
-
-        captured = capsys.readouterr()
-        assert f"Processing: {log_file}" in captured.out
-
-    def test_valid_file_no_stderr(self, tmp_path, capsys):
-        log_file = tmp_path / "sample.log"
-        log_file.write_text("log line")
-
-        with patch("sys.argv", ["main.py", str(log_file)]):
-            main()
-
-        captured = capsys.readouterr()
-        assert captured.err == ""
-
-
-class TestMainNonExistentFile:
-    def test_exits_with_code_1(self, tmp_path):
-        missing = tmp_path / "missing.log"
-
-        with patch("sys.argv", ["main.py", str(missing)]):
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-
-    def test_prints_error_to_stderr(self, tmp_path, capsys):
-        missing = tmp_path / "missing.log"
-
-        with patch("sys.argv", ["main.py", str(missing)]):
-            with pytest.raises(SystemExit):
-                main()
-
-        captured = capsys.readouterr()
-        assert "does not exist" in captured.err
-
-
-class TestMainDirectoryPath:
-    def test_exits_with_code_1_for_directory(self, tmp_path):
-        with patch("sys.argv", ["main.py", str(tmp_path)]):
-            with pytest.raises(SystemExit) as exc_info:
-                main()
-
-        assert exc_info.value.code == 1
-
-    def test_prints_error_to_stderr_for_directory(self, tmp_path, capsys):
-        with patch("sys.argv", ["main.py", str(tmp_path)]):
-            with pytest.raises(SystemExit):
-                main()
-
-        captured = capsys.readouterr()
-        assert "is not a file" in captured.err
-        assert str(tmp_path) in captured.err
-
-
-class TestMainCwdFallback:
-    def test_filename_only_found_in_cwd(self, tmp_path, capsys):
+class TestValidateFile:
+    def test_valid_file_returns_path(self, tmp_path):
         log_file = tmp_path / "app.log"
         log_file.write_text("log line")
 
-        with patch("sys.argv", ["main.py", "app.log"]):
-            with patch("main.Path.cwd", return_value=tmp_path):
-                main()
+        result = validate_file(log_file)
 
-        captured = capsys.readouterr()
-        assert "Processing:" in captured.out
-        assert "app.log" in captured.out
+        assert result == log_file
 
-    def test_filename_only_not_found_anywhere(self, tmp_path, capsys):
-        with patch("sys.argv", ["main.py", "ghost.log"]):
-            with patch("main.Path.cwd", return_value=tmp_path):
-                with pytest.raises(SystemExit) as exc_info:
-                    main()
+    def test_nonexistent_file_returns_none(self, tmp_path, capsys):
+        missing = tmp_path / "missing.log"
 
-        assert exc_info.value.code == 1
-        captured = capsys.readouterr()
-        assert "does not exist" in captured.err
+        result = validate_file(missing)
 
-    def test_absolute_path_does_not_fallback_to_cwd(self, tmp_path, capsys):
-        # File exists in cwd but an absolute path to a missing file should still fail
-        cwd_file = tmp_path / "app.log"
-        cwd_file.write_text("log line")
+        assert result is None
 
-        other_dir = tmp_path / "other"
-        other_dir.mkdir()
-        missing_absolute = other_dir / "app.log"
+    def test_nonexistent_file_prints_error(self, tmp_path, capsys):
+        missing = tmp_path / "missing.log"
 
-        with patch("sys.argv", ["main.py", str(missing_absolute)]):
-            with patch("main.Path.cwd", return_value=tmp_path):
-                with pytest.raises(SystemExit) as exc_info:
-                    main()
+        validate_file(missing)
 
-        assert exc_info.value.code == 1
+        assert "not a valid file" in capsys.readouterr().out
+
+    def test_empty_file_returns_none(self, tmp_path):
+        empty = tmp_path / "empty.log"
+        empty.write_text("")
+
+        result = validate_file(empty)
+
+        assert result is None
+
+    def test_empty_file_prints_error(self, tmp_path, capsys):
+        empty = tmp_path / "empty.log"
+        empty.write_text("")
+
+        validate_file(empty)
+
+        assert "empty" in capsys.readouterr().out
+
+    def test_directory_returns_none(self, tmp_path, capsys):
+        result = validate_file(tmp_path)
+
+        assert result is None
+
+    def test_directory_prints_error(self, tmp_path, capsys):
+        validate_file(tmp_path)
+
+        assert "not a valid file" in capsys.readouterr().out
+
+    def test_not_found_prints_searching_message(self, capsys):
+        validate_file(Path("ghost_nonexistent.log"))
+
+        assert "not found" in capsys.readouterr().out
+
+
+class TestProcessFile:
+    def test_returns_analyzer(self, tmp_path):
+        log_file = tmp_path / "app.log"
+        log_file.write_text(
+            '177.71.128.21 - - [10/Jul/2018:22:21:28 +0200] "GET /home HTTP/1.1" 200 3574\n'
+        )
+
+        from log_analyzer.analyzer import LogAnalyzer
+        result = process_file(log_file)
+
+        assert isinstance(result, LogAnalyzer)
+
+    def test_skips_invalid_lines(self, tmp_path):
+        log_file = tmp_path / "app.log"
+        log_file.write_text("invalid line\nanother bad line\n")
+
+        from log_analyzer.analyzer import LogAnalyzer
+        result = process_file(log_file)
+
+        assert isinstance(result, LogAnalyzer)
+
